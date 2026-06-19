@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스포터 느와르: 하드코어 포토 에디션</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Pretendard:wght@400;600;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Pretendard', 'Orbitron', sans-serif;
+            background: radial-gradient(circle at center, #06040d 0%, #010003 100%);
+            overscroll-behavior: none;
+        }
+        .glass-panel {
+            background: rgba(4, 3, 10, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+        }
+        .fever-glow {
+            box-shadow: inset 0 0 50px rgba(244, 63, 94, 0.2), 0 0 40px rgba(244, 63, 94, 0.1);
+            border-color: rgba(244, 63, 94, 0.3) !important;
+        }
+        .canvas-container {
+            aspect-ratio: 4 / 3;
+            width: 100%;
+            max-width: 540px;
+        }
+        /* 마우스 드래그 시 커서 변경 */
+        .cursor-grab { cursor: grab; }
+        .cursor-grabbing { cursor: grabbing; }
+        
+        @keyframes hardcoreShake {
+            0%, 100% { transform: translate(0, 0); }
+            10% { transform: translate(-8px, 6px); }
+            30% { transform: translate(8px, -6px); }
+            50% { transform: translate(-4px, -4px); }
+            70% { transform: translate(4px, 4px); }
+            90% { transform: translate(-2px, 2px); }
+        }
+        .shake-effect {
+            animation: hardcoreShake 0.35s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        /* 네온 가스 미세 깜빡임 */
+        @keyframes neonFlicker {
+            0%, 100% { opacity: 1; }
+            41% { opacity: 1; }
+            42% { opacity: 0.85; }
+            43% { opacity: 0.95; }
+            45% { opacity: 0.3; }
+            46% { opacity: 0.9; }
+        }
+        .neon-flicker {
+            animation: neonFlicker 4s infinite;
+        }
+    </style>
+</head>
+<body class="text-slate-300 min-h-screen flex flex-col justify-between overflow-x-hidden pb-4 transition-all duration-500 selection:bg-rose-500 selection:text-white">
+
+    <script>
+        // 하드코어 서스펜스 전용 프리미엄 음향 신디사이저 (Web Audio API)
+        const AudioSynth = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+            playCorrect(combo = 1) {
+                this.init();
+                const now = this.ctx.currentTime;
+                const baseFreq = 587.33 + (combo * 40); // 콤보 시 피치 증가
+                
+                // 고주파 오버톤 벨소리
+                this.playTone(baseFreq, 0.12, now, 'sine', 0.08);
+                this.playTone(baseFreq * 1.5, 0.22, now + 0.03, 'sine', 0.04);
+                this.playTone(baseFreq * 2.0, 0.35, now + 0.06, 'sine', 0.02);
+            },
+            playWrong() {
+                this.init();
+                const now = this.ctx.currentTime;
+                this.playTone(92.50, 0.35, now, 'sawtooth', 0.15);
+                this.playTone(65.41, 0.50, now + 0.05, 'triangle', 0.2);
+            },
+            playHint() {
+                this.init();
+                const now = this.ctx.currentTime;
+                for (let i = 0; i < 5; i++) {
+                    this.playTone(1200 - (i * 150), 0.08, now + (i * 0.06), 'sine', 0.04);
+                }
+            },
+            playFeverIn() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(80, now);
+                osc.frequency.exponentialRampToValueAtTime(320, now + 0.8);
+                
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.001, now + 0.8);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.8);
+            },
+            playWin() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const chord = [293.66, 349.23, 440.00, 523.25, 659.25, 783.99];
+                chord.forEach((freq, idx) => {
+                    this.playTone(freq, 0.3, now + idx * 0.08, 'sine', 0.05);
+                });
+            },
+            playGameOver() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(120, now);
+                osc.frequency.linearRampToValueAtTime(20, now + 2.0);
+                
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.linearRampToValueAtTime(0.001, now + 2.0);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 2.0);
+            },
+            playTone(freq, duration, startTime, type = 'sine', volume = 0.1) {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, startTime);
+                
+                gain.gain.setValueAtTime(volume, startTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.start(startTime);
+                osc.stop(startTime + duration);
+            }
+        };
+    </script>
+
+    <!-- 상단 헤더 바 (Glassmorphism 적용) -->
+    <header class="bg-slate-950/85 backdrop-blur-md border-b border-white/5 px-4 py-3 sticky top-0 z-50 transition-all duration-500" id="header-bar">
+        <div class="max-w-6xl mx-auto flex flex-wrap justify-between items-center gap-3">
+            <div class="flex items-center gap-3">
+                <span class="text-xl tracking-widest text-rose-500 font-bold animate-pulse">●</span>
+                <h1 class="text-base md:text-lg font-black tracking-[0.25em] bg-gradient-to-r from-slate-200 via-rose-400 to-indigo-300 bg-clip-text text-transparent font-['Orbitron']">
+                    SPOTTER NOIR
+                </h1>
+                <span id="fever-badge" class="text-[9px] tracking-[0.2em] bg-red-950/40 text-rose-400 font-semibold px-2.5 py-0.5 rounded border border-rose-500/10 font-['Orbitron']">HARDCORE EDITION</span>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <button onclick="Game.resetGame()" class="bg-slate-900/90 hover:bg-slate-800 text-slate-300 px-3 py-1 rounded border border-white/10 active:scale-95 transition-all text-[11px] font-bold tracking-wider font-['Orbitron']">
+                    🔄 REBOOT
+                </button>
+                <button onclick="Game.showManual()" class="bg-rose-950/30 hover:bg-rose-900/40 text-rose-300 px-3 py-1 rounded border border-rose-500/20 active:scale-95 transition-all text-[11px] font-bold tracking-wider font-['Orbitron']">
+                    💡 GUIDE
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 대시보드 및 게임 패널 -->
+    <main class="max-w-6xl mx-auto w-full px-4 py-3 flex-grow flex flex-col justify-center items-center gap-3">
+        
+        <!-- 상태 표시 대시보드 -->
+        <div id="status-dashboard" class="w-full max-w-4xl glass-panel rounded-xl p-3 flex flex-col md:flex-row justify-around items-center gap-3 text-center shadow-2xl transition-all duration-500">
+            <!-- 남은 시간 (타이머) -->
+            <div class="flex flex-col items-center min-w-[100px]">
+                <span class="text-[9px] text-slate-500 font-bold tracking-[0.2em] mb-1 font-['Orbitron']">REMAINING TIME</span>
+                <div class="flex items-center gap-1">
+                    <span id="timer-text" class="text-lg font-bold font-['Orbitron'] text-rose-500">45s</span>
+                </div>
+                <!-- 시간 게이지 바 -->
+                <div class="w-24 bg-slate-950 h-1 rounded-full overflow-hidden mt-1 border border-white/5">
+                    <div id="timer-bar" class="bg-gradient-to-r from-rose-600 to-indigo-600 h-full w-full transition-all duration-1000"></div>
+                </div>
+            </div>
+
+            <!-- 찾은 개수 & 콤보 게이지 -->
+            <div class="flex flex-col items-center min-w-[180px] px-5 py-1.5 bg-white/[0.01] rounded-lg border border-white/5">
+                <span class="text-[9px] text-rose-400 font-bold tracking-[0.2em] mb-1 font-['Orbitron']">DETECT PROGRESS</span>
+                <div class="flex items-center gap-2">
+                    <span class="text-xl font-black text-rose-500 font-['Orbitron']" id="found-count">0</span>
+                    <span class="text-sm text-slate-600">/</span>
+                    <span class="text-sm font-bold text-slate-400">5</span>
+                </div>
+                <!-- 스테이지 진척도 도트 -->
+                <div class="flex gap-1.5 mt-1.5" id="progress-dots"></div>
+                
+                <!-- 실시간 콤보 소멸 게이지 -->
+                <div class="w-full h-0.5 bg-slate-950 rounded-full mt-2 overflow-hidden border border-white/5">
+                    <div id="combo-bar" class="w-0 h-full bg-gradient-to-r from-rose-500 to-amber-500 transition-all duration-300"></div>
+                </div>
+            </div>
+
+            <!-- 시너지 배율 -->
+            <div class="flex flex-col items-center min-w-[100px] justify-center h-12">
+                <span class="text-[9px] text-slate-500 font-bold tracking-[0.2em] mb-0.5 font-['Orbitron']">DETECTION SCORE</span>
+                <div id="combo-status" class="text-lg font-bold text-slate-500 font-['Orbitron']">
+                    x1.0
+                </div>
+                <div id="combo-count-badge" class="text-[9px] text-amber-500 font-bold tracking-widest opacity-0 transition-opacity">
+                    0 COMBO
+                </div>
+            </div>
+
+            <!-- 기회 잔여 수량 (실패 한도) -->
+            <div class="flex flex-col items-center min-w-[100px]">
+                <span class="text-[9px] text-slate-500 font-bold tracking-[0.2em] mb-1 font-['Orbitron']">INTEGRITY HP</span>
+                <div id="heart-container" class="flex gap-1 text-sm tracking-tight text-rose-600">
+                    ◆ ◆ ◆ ◆ ◆
+                </div>
+            </div>
+
+            <!-- 스테이지 & 토탈 스코어 -->
+            <div class="flex flex-col items-center min-w-[120px]">
+                <span class="text-[9px] text-slate-500 font-bold tracking-[0.2em] mb-0.5 font-['Orbitron']" id="stage-title-label">STAGE 1</span>
+                <div class="text-xs font-semibold text-rose-300 truncate tracking-wide" id="stage-name-display">도쿄 느와르 게이트</div>
+                <div class="text-xs text-amber-500 font-bold mt-1 font-['Orbitron']" id="score-display">SCORE: 00000</div>
+            </div>
+        </div>
+
+        <!-- 메인 캔버스 뷰포트 (돋보기 제어용 모듈 탑재) -->
+        <div id="game-canvases-container" class="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-3 justify-items-center mt-1">
+            <!-- 원본 이미지 캔버스 카드 -->
+            <div class="relative w-full flex flex-col items-center glass-panel p-1.5 rounded-lg border border-white/5 shadow-2xl">
+                <span class="absolute top-3 left-3 z-20 bg-slate-950/90 text-slate-400 border border-white/10 font-bold text-[8px] px-2 py-0.5 rounded tracking-[0.2em] font-['Orbitron'] shadow-md">SCREEN_A : SOURCE</span>
+                
+                <div class="canvas-container relative overflow-hidden rounded bg-[#010003] shadow-inner border border-white/5 cursor-grab" id="container-left" onmousedown="Game.handleDragStart(event, 'left')" onmousemove="Game.handleDrag(event)" onmouseup="Game.handleDragEnd()" onmouseleave="Game.handleDragEnd()">
+                    <canvas id="canvas-left" class="absolute top-0 left-0 w-full h-full"></canvas>
+                    <div id="float-left" class="absolute inset-0 pointer-events-none z-10"></div>
+                </div>
+            </div>
+
+            <!-- 타겟 이미지 캔버스 카드 -->
+            <div class="relative w-full flex flex-col items-center glass-panel p-1.5 rounded-lg border border-white/5 shadow-2xl">
+                <span class="absolute top-3 left-3 z-20 bg-slate-950/90 text-rose-400 border border-rose-500/20 font-bold text-[8px] px-2 py-0.5 rounded tracking-[0.2em] font-['Orbitron'] shadow-md">SCREEN_B : MODIFIED</span>
+                
+                <div class="canvas-container relative overflow-hidden rounded bg-[#010003] shadow-inner border border-white/5 cursor-grab" id="container-right" onmousedown="Game.handleDragStart(event, 'right')" onmousemove="Game.handleDrag(event)" onmouseup="Game.handleDragEnd()" onmouseleave="Game.handleDragEnd()">
+                    <canvas id="canvas-right" class="absolute top-0 left-0 w-full h-full"></canvas>
+                    <div id="float-right" class="absolute inset-0 pointer-events-none z-10"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 하단 컨트롤 도구함 -->
+        <div class="w-full max-w-4xl flex flex-col sm:flex-row justify-between items-center gap-3 bg-white/[0.01] p-3 rounded-lg border border-white/5">
+            <div class="flex flex-wrap items-center gap-2 text-slate-500 text-[10px] tracking-wide">
+                <span class="text-rose-500 font-black tracking-wider">🔬 HARCORE CLONE STAMP ENGINE:</span>
+                <span>실제 이미지의 주변 픽셀 영역을 자연스럽게 복사해 이물질을 감추어 변조하였습니다. 돋보기 줌을 적극 조준하세요.</span>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <!-- 돋보기 줌 모드 단추 -->
+                <button id="zoom-button" onclick="Game.toggleZoom()" class="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-white/10 font-bold px-4 py-2 rounded shadow transition-all active:scale-95 text-[10px] tracking-widest font-['Orbitron']">
+                    🔍 ZOOM <span id="zoom-status-text" class="text-rose-500 font-extrabold">1.0x</span>
+                </button>
+                
+                <!-- 힌트 사용 단추 -->
+                <button id="hint-button" onclick="Game.useHint()" class="flex items-center gap-1.5 bg-gradient-to-r from-rose-700 to-rose-600 hover:brightness-110 text-white font-bold px-5 py-2 rounded shadow transition-all active:scale-95 text-[10px] tracking-widest font-['Orbitron']">
+                    SCAN ERROR <span id="hint-count-badge" class="bg-black/40 text-rose-300 font-bold text-[9px] px-1.5 py-0.5 rounded">3</span>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- 1. 안내 설명 모달 -->
+    <div id="modal-intro" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md px-4">
+        <div class="bg-gradient-to-b from-slate-950 via-[#0a0614] to-black p-6 md:p-8 rounded-xl border border-rose-500/10 max-w-lg w-full shadow-2xl text-center">
+            <div class="w-12 h-12 bg-rose-950/50 rounded flex items-center justify-center mx-auto mb-4 border border-rose-500/20">
+                <span class="text-xl">🕵️‍♂️</span>
+            </div>
+            <h2 class="text-lg md:text-xl font-black mb-3 bg-gradient-to-r from-slate-100 to-rose-500 bg-clip-text text-transparent tracking-[0.3em] font-['Orbitron']">
+                SPOTTER NOIR: HARDCORE
+            </h2>
+            <p class="text-slate-400 text-xs md:text-xs leading-relaxed mb-5 tracking-wide">
+                실제 고화질 사진을 변조한 극악무도한 정보국 해킹 훈련 모듈입니다.<br>
+                단순히 가짜 티가 나는 마커 도형 레이어링 대신, <strong class="text-rose-400">사진의 인접 배경을 복사/합성한 정밀 포토 클로닝</strong>이 적용되었습니다.
+            </p>
+            <div class="bg-black/80 p-3 rounded border border-white/5 text-[11px] text-slate-400 space-y-2 text-left leading-relaxed">
+                <div class="flex items-start gap-2">
+                    <span class="text-rose-500 font-bold">🔍</span>
+                    <span><strong>동기화 초정밀 줌 기능</strong>: 우측 하단의 <strong class="text-white">ZOOM</strong> 활성화 시 2.5배 확대되며, 드래그를 통해 좌/우 동시 1:1 탐색이 가능합니다.</span>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span class="text-rose-500 font-bold">💀</span>
+                    <span><strong>실사 합성 무결점 판정 (16px)</strong>: 오직 고도의 픽셀 관찰력으로 짚어내야만 정답 처리됩니다. 틀린 부위를 짚지 못하면 가차 없이 <strong>남은 시간 7초가 강제 차감</strong>됩니다.</span>
+                </div>
+                <div class="flex items-start gap-2">
+                    <span class="text-amber-500 font-bold">⚡</span>
+                    <span><strong>콤보 앤 피버 폭주 시스템</strong>: 신속하게 미세 결함을 복원할 시 보너스 점수가 가중 폭증합니다.</span>
+                </div>
+            </div>
+            <button onclick="Game.startFirstStage()" class="w-full mt-5 py-2.5 bg-gradient-to-r from-rose-800 to-indigo-950 hover:brightness-110 active:scale-95 text-white font-bold rounded shadow-lg transition-all text-[11px] tracking-[0.2em] font-['Orbitron']">
+                INITIATE SCANNER
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. 다음 스테이지 진입 / 승리 모달 -->
+    <div id="modal-success" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md px-4 hidden">
+        <div class="bg-gradient-to-b from-slate-950 via-[#040c0f] to-black p-6 md:p-8 rounded-xl border border-emerald-500/10 max-w-lg w-full shadow-2xl text-center">
+            <div class="text-3xl mb-3">🎖️</div>
+            <h2 class="text-base font-bold text-emerald-400 mb-2 tracking-[0.25em] font-['Orbitron']">STAGE CLEARED</h2>
+            <p class="text-slate-400 text-xs mb-5 tracking-wide" id="success-message">해당 영역의 고압 분석 데이터 불일치를 완전 복구 완료하였습니다.</p>
+            
+            <div class="bg-black/60 p-3 rounded border border-white/5 mb-5 text-[11px]">
+                <div class="grid grid-cols-2 gap-3 text-center">
+                    <div>
+                        <div class="text-[8px] text-slate-500 uppercase font-bold tracking-[0.15em] font-['Orbitron']">CUMULATIVE SCORE</div>
+                        <div class="text-base font-black text-emerald-400 font-['Orbitron']" id="success-score">0</div>
+                    </div>
+                    <div>
+                        <div class="text-[8px] text-slate-500 uppercase font-bold tracking-[0.15em] font-['Orbitron']">TIME MARGIN BONUS</div>
+                        <div class="text-base font-black text-amber-500 font-['Orbitron']" id="success-time-bonus">+100</div>
+                    </div>
+                </div>
+            </div>
+
+            <button id="success-next-btn" onclick="Game.loadNextStage()" class="w-full py-2.5 bg-gradient-to-r from-emerald-800 to-slate-900 hover:brightness-110 text-white font-bold rounded shadow-lg transition-all text-[10px] tracking-[0.2em] font-['Orbitron']">
+                PROCEED TO NEXT MATRIX
+            </button>
+        </div>
+    </div>
+
+    <!-- 3. 게임 오버 모달 -->
+    <div id="modal-fail" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/98 backdrop-blur-md px-4 hidden">
+        <div class="bg-gradient-to-b from-slate-950 to-red-950/20 p-6 md:p-8 rounded-xl border border-rose-500/10 max-w-lg w-full shadow-2xl text-center">
+            <div class="text-3xl mb-3">🚨</div>
+            <h2 class="text-base font-bold text-rose-500 mb-2 tracking-[0.25em] font-['Orbitron']">DECRYPT FAILURE</h2>
+            <p class="text-slate-400 text-xs mb-5 tracking-wide" id="fail-reason-text">기회를 모두 탕진하여 그리드가 영구 잠금 상태에 들어갔습니다.</p>
+            
+            <button onclick="Game.restartCurrentStage()" class="w-full py-2.5 bg-gradient-to-r from-rose-800 to-indigo-950 hover:brightness-110 text-white font-bold rounded shadow transition-all text-[10px] tracking-[0.15em] mb-2 font-['Orbitron']">
+                RETRY CURRENT MATRIX
+            </button>
+            <button onclick="Game.resetGame()" class="w-full py-2 bg-slate-950 hover:bg-slate-900 text-slate-500 font-semibold rounded text-[9px] tracking-wider font-['Orbitron'] border border-white/5">
+                ABORT DECRYPTION
+            </button>
+        </div>
+    </div>
+
+    <footer class="text-center text-slate-700 text-[9px] px-4 mt-3 font-['Orbitron'] tracking-[0.2em]">
+        <p>© 2026 SPOTTER NOIR. HARDCORE RE-PARALLAX CLONE ENGINE.</p>
+    </footer>
+
+    <script>
+        // 무작위 유틸리티 함수
+        const Rnd = {
+            val: (min, max) => Math.random() * (max - min) + min,
+            int: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min,
+            choose: (arr) => arr[Math.floor(Math.random() * arr.length)],
+        };
+
+        // 완벽한 클론 스탬핑 좌표가 정의된 3개 스테이지 에셋
+        const STAGES = [
+            // ==========================================
+            // STAGE 1: 도쿄 사이버 스트리트 (실사)
+            // ==========================================
+            {
+                name: "도쿄 사이버 시티 게이트",
+                titleLabel: "STAGE 1",
+                imageUrl: "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=800&h=600&q=80",
+                fallbackBg: "#030209",
+                // 실사 로드 실패 대비용 렌더러
+                drawFallback(ctx) {
+                    const w = ctx.canvas.width;
+                    const h = ctx.canvas.height;
+                    ctx.fillStyle = '#020108';
+                    ctx.fillRect(0, 0, w, h);
+                    for (let i = 0; i < w; i += 40) {
+                        ctx.strokeStyle = i % 80 === 0 ? 'rgba(99, 102, 241, 0.1)' : 'rgba(244, 63, 94, 0.05)';
+                        ctx.lineWidth = 1;
+                        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, h); ctx.stroke();
+                    }
+                },
+                differences: [
+                    {
+                        id: "st1_lit_window_off",
+                        hitX: 180, hitY: 180, radius: 14,
+                        draw(ctx, isModified, img) {
+                            if (isModified) {
+                                if (img) {
+                                    // lit window -> 주변의 어두운 창문 영역을 가져다 덮음 (클론 스탬핑)
+                                    ctx.drawImage(img, 200, 170, 20, 25, 170, 170, 20, 25);
+                                } else {
+                                    ctx.fillStyle = '#0a0a10';
+                                    ctx.fillRect(170, 170, 20, 25);
+                                }
+                            }
+                        }
+                    },
+                    {
+                        id: "st1_sky_wire_erase",
+                        hitX: 520, hitY: 150, radius: 16,
+                        draw(ctx, isModified, img) {
+                            if (isModified) {
+                                if (img) {
+                                    // 공중 가로선을 주변의 비어있는 그라데이션 밤하늘 텍스처로 완전히 복사해 제거
+                                    ctx.drawImage(img, 520, 120, 40, 20, 500, 140, 40, 20);
+                                } else {
+                                    ctx.strokeStyle = '#050a18';
+                                    ctx.lineWidth = 5;
+                                    ctx.beginPath(); ctx.moveTo(490, 140); ctx.lineTo(550, 160); ctx.stroke();
+                                }
+                            }
+                        }
+                    },
+                    {
+                        id: "st1_dry_puddle",
+                        hitX: 235, hitY: 510, radius: 18,
+                        draw(ctx, isModified, img) {
+                            if (isModified) {
+                                if (img) {
+                                    // 네온 반사가 일어나는 바닥 물웅덩이를 근처의 순수 아스팔트 건조 질감으로 덮어 말림
+                                    ctx.drawImage(img, 275, 510, 36, 20, 217, 500, 36, 20);
+                                } else {
+                                    ctx.fillStyle = 'rgba(244, 63, 94, 0.3)';
+                                    ctx.beginPath(); ctx.ellipse(235, 510, 15, 6, 0.2, 0, Math.PI * 2); ctx.fill();
+                                }
+                            }
+                        }
+                    },
+                    {
+                        id: "st1_sign_neon_off",
+                        hitX: 385, hitY: 280, radius: 16,
+                        draw(ctx, isModified, img) {
+                            if (isModified) {
+                                if (img) {
+                                    // 한쪽 벽면 매장의 네온 사인 불빛을 공백 암흑 벽 패치로 오버레이 처리
+                                    ctx.drawImage(img, 385, 230, 30, 30, 370, 265, 30, 30);
+                                } else {
+                                    ctx.fillStyle = 'rgba(5, 5, 10, 0.95)';
+                                    ctx.beginPath(); ctx.arc(385, 280, 15, 0, Math.PI * 2); ctx.fill();
+                                }
+                            }
+                        }
+                    },
+                    {
+                        id: "st1_antenna_light_off",
+                        hitX: 405, hitY: 82, radius: 15,
+                        draw(ctx, isModified, img) {
+                            if (isModified) {
+                                if (img) {
+                                    // 피뢰침 끝단 초정밀 전구 위치를 원거리 깨끗한 하늘 그라데이션으로 가림
+                                    ctx.drawImage(img, 425, 82, 16, 16, 397, 74, 16, 16);
+                                } else {
+                                    ctx.fillStyle = '#060a16';
+                                    ctx.beginPath(); ctx.arc(405, 82, 8, 0, Math.PI * 2); ctx.fill();
+                                }
+                            }
+                        }
+                    }
+                ]
+            },
+
+            // ==========================================
+            // STAGE 2: 대성당 아카이브 (실사)
+            // ==========================================
+            {
+                name: "대성당 고문서 아카이브",
+                titleLabel: "STAGE 2",
+                imageUrl: "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=800&h=600&q=80",
+                fallbackBg: "#0d0a07",
+                drawFallback(ctx) {
+                    const w = ctx.canvas.width;
+                    const h = ctx.canvas.height;
+                    ctx.fillStyle = '#120f0c';
+                    ctx.fillRect(0, 0, w, h);
+                    for (let i = 0; i < h; i += 30) {
+                        ctx.strokeStyle = 'rgba(139, 92, 26, 0.1)';
+                        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(w, i); ctx.stroke();
+                    }
+                },
+                differences: [
+                    {
+                        id: "st2_book_replace",
+                        hitX: 415, hitY: 310, radius: 15,
+                        draw(ctx, isModified, img) {
+                            if (isModified) {
+                                if (img) {
+                                    // 책등의 갈색 무늬를 인접한 다른 어두운 서적 책꽂이 텍스처로 대체 합성
+                                    ctx.drawImage(img, 445, 290, 16, 40, 407, 290, 16, 40);
+                                } else {
+                                    ctx.fillStyle = '#4a4d52';
+                                    ctx.fillRect(409, 290, 12, 38);
+                                }
+                            }
+                        }
+                    },
+                    {
+                        id: "st2_railing_remove",
+                        hitX: 255, hitY: 235, radius: 15,
+                        draw(ctx, isModified, img) {
+                            if (isModified) {
+                                if (img) {
+                                    // 복도 난간 기둥 살대 중 하나를 기둥 사이 공백 음영 영역으로 완벽히 채워 증발시킴
+                                    ctx.drawImage(img, 235, 215, 12, 40, 249, 215, 12, 40);
+                                } else {
+                                    ctx.fillStyle = '#0f0c0a';
+                                    ctx.fillRect(251, 215, 7, 36);
+                                }
+                            }
+                        }
+                    },
+                    {
+                        id: "st2_globe_rim_erase",
+                        hitX: 630, hitY: 390, radius: 16,
+                        draw(ctx, isModified, img) {
+                            if (isModified) {
+                                if (img) {
+                                    // 우측 책상 끝 지구본 지지대 실루엣을 바로 옆 목재 수납장 질감으로 클론하여 제거
+                                    ctx.drawImage(img, 600, 375, 30, 30, 615, 375, 30, 30);
+                                } else {
+                                    ctx.fillStyle = '#18120e';
+                                    ctx.beginPath(); ctx.arc(630, 390, 15, 0, Math.PI * 2); ctx.fill();
+                                }
+                            }
+                        }
+                    },
+                    {
+                        id: "st2_desk_bar_hide",
+                        hitX: 300, hitY: 460, radius: 18,
+                        draw(ctx, isModified, img) {
+                            if (isModified) {
+                                if (img) {
+                                    // 대리석 바닥 근처의 데스크 지지용 금속 프레임을 옆 바닥 대리석 패턴으로 완전 복제 덮어씌움
+                                    ctx.drawImage(img, 340, 450, 35, 20, 282, 450, 35, 20);
+                                } else {
+                                    ctx.fillStyle = '#0a0806';
+                                    ctx.fillRect(285, 452, 30, 16);
+                                }
+                            }
+                        }
+                    },
+                    {
+                        id: "st2_pillar_crack_clean",
+                        hitX: 135, hitY: 340, radius: 16,
+                        draw(ctx, isModified, img) {
+                            if (isModified) {
+                                if (img) {
+                                    // 기둥 한 켠의 자잘한 무늬 자국을 깨끗하게 연마된 위쪽 기둥 패치로 클론 복사하여 마감
+                                    ctx.drawImage(img, 135, 300, 24, 24, 123, 328, 24, 24);
+                                } else {
+                                    ctx.fillStyle = '#2d251d';
+                                    ctx.fillRect(125, 335, 20, 10);
+                                }
+                            }
+                        }
+                    }
+                ]
+            },
+
+            // ==========================================
+            // STAGE 3: 초정밀 하이엔드 기계장치 (실사)
+            // ==========================================
+            {
+                name: "마이크로 클락워크 크로노그래프",
+                titleLabel: "STAGE 3",
+                imageUrl: "https://images.unsplash.com/photo-1509048191080-d2984bad6ae5?auto=format&fit=crop&w=800&h=600&q=80",
+                fallbackBg: "#050608",
+                drawFallback(ctx) {
+                    const w = ctx.canvas.width;
+                    const h = ctx.canvas.height;
+                    ctx.fillStyle = '#0a0b0d';
+                    ctx.fillRect(0, 0, w, h);
+                    for (let r = 50; r < 300; r += 50) {
+                        ctx.strokeStyle = 'rgba(212, 175, 55, 0.08)';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath(); ctx.arc(w/2, h/2, r, 0, Math.PI * 2); ctx.stroke();
+                    }
+                },
+                differences: [
+                    {
+                        id: "st3_jewel_replace",
+                        hitX: 478, hitY: 260, radius: 15,
+                        draw(ctx, isModified, img) {
+                            if (isModified) {
+                                if (img) {
+                                    // 붉은 인조 루비 베어링 표면을 가차없이 무광 황동 프레임 표면 질감으로 스탬핑하여 봉인
+                                    ctx.drawImage(img, 478, 220, 20, 20, 468, 250, 20, 20);
+                                } else {
+                                    ctx.fillStyle = '#121316';
+                                    ctx.beginPath(); ctx.arc(478, 260, 10, 0, Math.PI * 2); ctx.fill();
+                                }
+                            }
+                        }
+                    },
+                    {
+                        id: "st3_screw_erase",
+                        hitX: 382, hitY: 172, radius: 14,
+                        draw(ctx, isModified, img) {
+                            if (isModified) {
+                                if (img) {
+                                    // 무브먼트의 핵심 고정 나사 부위를 매끄러운 강철 브리지 바디면으로 클로닝하여 지워버림
+                                    ctx.drawImage(img, 382, 140, 18, 18, 373, 163, 18, 18);
+                                } else {
+                                    ctx.fillStyle = '#9aa1a6';
+                                    ctx.beginPath(); ctx.arc(382, 172, 9, 0, Math.PI * 2); ctx.fill();
+                                }
+                            }
+                        }
+                    },
+                    {
+                        id: "st3_plate_rivet_hide",
+                        hitX: 345, hitY: 485, radius: 15,
+                        draw(ctx, isModified, img) {
+                            if (isModified) {
+                                if (img) {
+                                    // 지지 플러그 하단의 황동 마감용 리벳 점을 근처 순정 금속 플레이트 조직으로 은폐
+                                    ctx.drawImage(img, 315, 485, 20, 20, 335, 475, 20, 20);
+                                } else {
+                                    ctx.fillStyle = '#282a30';
+                                    ctx.beginPath(); ctx.arc(345, 485, 11, 0, Math.PI * 2); ctx.fill();
+                                }
+                            }
+                        }
+                    },
+                    {
+                        id: "st3_gear_tooth_vanish",
+                        hitX: 310, hitY: 340, radius: 16,
+                        draw(ctx, isModified, img) {
+                            if (isModified) {
+                                if (img) {
+                                    // 톱니 이빨 부위를 기어 뒷편의 어두운 무광 검정 공백부 텍스처로 지워 무딘 테두리로 변형
+                                    ctx.drawImage(img, 290, 340, 20, 20, 300, 330, 20, 20);
+                                } else {
+                                    ctx.fillStyle = '#1c1e22';
+                                    ctx.fillRect(298, 330, 24, 20);
+                                }
+                            }
+                        }
+                    },
+                    {
+                        id: "st3_brass_line_erase",
+                        hitX: 580, hitY: 320, radius: 16,
+                        draw(ctx, isModified, img) {
+                            if (isModified) {
+                                if (img) {
+                                    // 부품 외곽 금색 선의 경계선을 인접한 극도로 정밀한 어두운 그림자 영역 패치로 차폐
+                                    ctx.drawImage(img, 605, 320, 24, 24, 568, 308, 24, 24);
+                                } else {
+                                    ctx.fillStyle = '#261e12';
+                                    ctx.fillRect(570, 310, 20, 20);
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        ];
+    </script>
+
+    <script>
+        const Game = {
+            currentStageIdx: 0,
+            activeDifferences: [],
+            foundDiffs: [],
+
+            // 수치 및 한도 변수 정의 (하드코어 난이도 세팅)
+            hearts: 5,
+            score: 0,
+            timer: 45,
+            hintsLeft: 3,
+            gameActive: false,
+            timerInterval: null,
+
+            // 콤보 및 스파크 연출 제어
+            combo: 0,
+            comboMaxTime: 3000, 
+            comboTimer: null,
+            comboPercent: 0,
+            isFever: false,
+            particles: [],
+
+            // 돋보기 줌 & 패닝 시스템 핵심 변수
+            zoomActive: false,
+            zoomScale: 2.5, 
+            panX: 0,
+            panY: 0,
+            isDragging: false,
+            startX: 0,
+            startY: 0,
+            draggedNode: null,
+
+            canvasL: null,
+            canvasR: null,
+            ctxL: null,
+            ctxR: null,
+
+            // Unsplash 이미지 캐시 객체
+            currentImg: null,
+            imageLoaded: false,
+
+            // 내부 가상 원본 해상도 규격 (800x600 4:3)
+            baseWidth: 800,
+            baseHeight: 600,
+
+            init() {
+                this.canvasL = document.getElementById('canvas-left');
+                this.canvasR = document.getElementById('canvas-right');
+                this.ctxL = this.canvasL.getContext('2d');
+                this.ctxR = this.canvasR.getContext('2d');
+
+                // 리사이즈 관찰
+                window.addEventListener('resize', () => this.handleResize());
+                
+                // 마우스 클릭 조준 (CORS 안전지대 패러랠 좌표 변환)
+                this.canvasL.addEventListener('click', (e) => this.handleCanvasClick(e, 'left'));
+                this.canvasR.addEventListener('click', (e) => this.handleCanvasClick(e, 'right'));
+
+                // 모바일 터치 대응을 위한 드래그/패닝 제어 등록
+                const contL = document.getElementById('container-left');
+                const contR = document.getElementById('container-right');
+                
+                contL.addEventListener('touchstart', (e) => this.handleTouchStart(e, 'left'), { passive: false });
+                contR.addEventListener('touchstart', (e) => this.handleTouchStart(e, 'right'), { passive: false });
+                window.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
+                window.addEventListener('touchend', () => this.handleTouchEnd());
+
+                // 렌더 프레임 애니메이션 기동
+                this.startAnimationLoop();
+            },
+
+            handleResize() {
+                if (!this.canvasL || !this.canvasR) return;
+                const dpr = window.devicePixelRatio || 1;
+                
+                this.canvasL.width = this.baseWidth * dpr;
+                this.canvasL.height = this.baseHeight * dpr;
+                this.canvasR.width = this.baseWidth * dpr;
+                this.canvasR.height = this.baseHeight * dpr;
+
+                this.ctxL.setTransform(dpr, 0, 0, dpr, 0, 0);
+                this.ctxR.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+                this.render();
+            },
+
+            toggleZoom() {
+                if (!this.gameActive) return;
+                this.zoomActive = !this.zoomActive;
+                
+                const btnStatus = document.getElementById('zoom-status-text');
+                const containers = [document.getElementById('container-left'), document.getElementById('container-right')];
+
+                if (this.zoomActive) {
+                    btnStatus.innerText = `${this.zoomScale.toFixed(1)}x`;
+                    btnStatus.className = "text-emerald-400 font-extrabold animate-pulse";
+                    
+                    this.panX = -this.baseWidth * (this.zoomScale - 1) / 2;
+                    this.panY = -this.baseHeight * (this.zoomScale - 1) / 2;
+                    
+                    containers.forEach(c => c.className = "canvas-container relative overflow-hidden rounded bg-[#010003] shadow-inner border border-white/5 cursor-grab");
+                } else {
+                    btnStatus.innerText = "1.0x";
+                    btnStatus.className = "text-rose-500 font-extrabold";
+                    this.panX = 0;
+                    this.panY = 0;
+                    containers.forEach(c => c.className = "canvas-container relative overflow-hidden rounded bg-[#010003] shadow-inner border border-white/5");
+                }
+                this.render();
+            },
+
+            handleDragStart(e, side) {
+                if (!this.zoomActive || !this.gameActive) return;
+                this.isDragging = true;
+                this.draggedNode = side;
+                this.startX = e.clientX - this.panX;
+                this.startY = e.clientY - this.panY;
+                
+                document.getElementById('container-left').style.cursor = 'grabbing';
+                document.getElementById('container-right').style.cursor = 'grabbing';
+            },
+
+            handleDrag(e) {
+                if (!this.isDragging || !this.zoomActive) return;
+                this.panX = e.clientX - this.startX;
+                this.panY = e.clientY - this.startY;
+                this.clampPan();
+                this.render();
+            },
+
+            handleDragEnd() {
+                this.isDragging = false;
+                if (this.zoomActive) {
+                    document.getElementById('container-left').style.cursor = 'grab';
+                    document.getElementById('container-right').style.cursor = 'grab';
+                }
+            },
+
+            handleTouchStart(e, side) {
+                if (!this.zoomActive || !this.gameActive) return;
+                const touch = e.touches[0];
+                this.isDragging = true;
+                this.draggedNode = side;
+                this.startX = touch.clientX - this.panX;
+                this.startY = touch.clientY - this.panY;
+            },
+
+            handleTouchMove(e) {
+                if (!this.isDragging || !this.zoomActive) return;
+                e.preventDefault();
+                const touch = e.touches[0];
+                this.panX = touch.clientX - this.startX;
+                this.panY = touch.clientY - this.startY;
+                this.clampPan();
+                this.render();
+            },
+
+            handleTouchEnd() {
+                this.isDragging = false;
+            },
+
+            clampPan() {
+                const minX = -this.baseWidth * (this.zoomScale - 1);
+                const minY = -this.baseHeight * (this.zoomScale - 1);
+                this.panX = Math.max(minX, Math.min(0, this.panX));
+                this.panY = Math.max(minY, Math.min(0, this.panY));
+            },
+
+            startFirstStage() {
+                AudioSynth.init();
+                document.getElementById('modal-intro').classList.add('hidden');
+                this.currentStageIdx = 0;
+                this.hearts = 5;
+                this.score = 0;
+                this.hintsLeft = 3;
+                this.combo = 0;
+                this.isFever = false;
+                this.zoomActive = false;
+                
+                const btnStatus = document.getElementById('zoom-status-text');
+                btnStatus.innerText = "1.0x";
+                btnStatus.className = "text-rose-500 font-extrabold";
+                
+                this.setupStage();
+            },
+
+            setupStage() {
+                const stage = STAGES[this.currentStageIdx];
+                this.foundDiffs = [];
+                this.timer = 45; 
+                this.gameActive = true;
+                this.combo = 0;
+                this.isFever = false;
+                this.panX = 0;
+                this.panY = 0;
+                this.updateFeverUI();
+
+                // 5개 수배 선별
+                const shuffled = [...stage.differences].sort(() => 0.5 - Math.random());
+                this.activeDifferences = shuffled.slice(0, 5);
+
+                document.getElementById('stage-title-label').innerText = stage.titleLabel;
+                document.getElementById('stage-name-display').innerText = stage.name;
+                document.getElementById('found-count').innerText = "0";
+                this.updateScoreUI();
+                document.getElementById('hint-count-badge').innerText = this.hintsLeft;
+                
+                this.updateHeartsUI();
+                this.updateProgressDots();
+
+                // Unsplash 이미지 프리 로드 및 CORS 바인딩
+                this.imageLoaded = false;
+                this.currentImg = new Image();
+                this.currentImg.crossOrigin = "anonymous";
+                
+                this.ctxL.clearRect(0, 0, this.baseWidth, this.baseHeight);
+                this.ctxR.clearRect(0, 0, this.baseWidth, this.baseHeight);
+                this.drawLoadingIndicator(this.ctxL, "IMAGE STREAM_A LOADING...");
+                this.drawLoadingIndicator(this.ctxR, "IMAGE STREAM_B LOADING...");
+
+                this.currentImg.onload = () => {
+                    this.imageLoaded = true;
+                    this.handleResize();
+                };
+
+                this.currentImg.onerror = () => {
+                    this.imageLoaded = false;
+                    this.handleResize();
+                };
+
+                this.currentImg.src = stage.imageUrl;
+
+                // 타이머 처리
+                if (this.timerInterval) clearInterval(this.timerInterval);
+                this.timerInterval = setInterval(() => {
+                    if (this.gameActive) {
+                        this.timer--;
+                        document.getElementById('timer-text').innerText = `${this.timer}s`;
+                        
+                        const pct = (this.timer / 45) * 100;
+                        const bar = document.getElementById('timer-bar');
+                        bar.style.width = `${pct}%`;
+
+                        if (this.timer <= 10) {
+                            document.getElementById('timer-text').className = 'text-lg font-bold font-["Orbitron"] text-rose-500 animate-pulse';
+                        } else {
+                            document.getElementById('timer-text').className = 'text-lg font-bold font-["Orbitron"] text-slate-300';
+                        }
+
+                        if (this.timer <= 0) {
+                            this.triggerGameOver("제한 시간 이내에 분석하지 못했습니다.");
+                        }
+                    }
+                }, 1000);
+            },
+
+            drawLoadingIndicator(ctx, text) {
+                ctx.save();
+                ctx.fillStyle = "#030207";
+                ctx.fillRect(0, 0, this.baseWidth, this.baseHeight);
+                ctx.fillStyle = "#e2e8f0";
+                ctx.font = "bold 20px 'Orbitron'";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(text, this.baseWidth/2, this.baseHeight/2);
+                ctx.restore();
+            },
+
+            startAnimationLoop() {
+                const loop = () => {
+                    this.updateComboTimer();
+                    this.updateParticles();
+                    this.render();
+                    requestAnimationFrame(loop);
+                };
+                requestAnimationFrame(loop);
+            },
+
+            updateComboTimer() {
+                if (!this.gameActive || this.combo === 0) {
+                    this.comboPercent = 0;
+                    document.getElementById('combo-bar').style.width = '0%';
+                    return;
+                }
+
+                const elapsed = Date.now() - this.comboTimer;
+                const remaining = this.comboMaxTime - elapsed;
+
+                if (remaining <= 0) {
+                    this.combo = 0;
+                    this.isFever = false;
+                    this.updateFeverUI();
+                    this.comboPercent = 0;
+                } else {
+                    this.comboPercent = (remaining / this.comboMaxTime) * 100;
+                }
+
+                document.getElementById('combo-bar').style.width = `${this.comboPercent}%`;
+            },
+
+            updateFeverUI() {
+                const badge = document.getElementById('fever-badge');
+                const dashboard = document.getElementById('status-dashboard');
+                const comboStatus = document.getElementById('combo-status');
+                const comboCountBadge = document.getElementById('combo-count-badge');
+
+                let multiplier = 1.0;
+                if (this.combo > 0) {
+                    multiplier = 1.0 + (this.combo * 0.3);
+                    if (multiplier > 2.5) multiplier = 2.5;
+                }
+
+                comboStatus.innerText = `x${multiplier.toFixed(1)}`;
+                
+                if (this.combo > 0) {
+                    comboStatus.className = 'text-lg font-bold font-["Orbitron"] bg-gradient-to-r from-rose-500 to-amber-500 bg-clip-text text-transparent';
+                    comboCountBadge.innerText = `${this.combo} COMBO`;
+                    comboCountBadge.classList.remove('opacity-0');
+                } else {
+                    comboStatus.className = 'text-lg font-bold font-["Orbitron"] text-slate-500';
+                    comboCountBadge.classList.add('opacity-0');
+                }
+
+                if (this.isFever) {
+                    badge.innerText = "CRITICAL SCAN ON";
+                    badge.className = "text-[9px] tracking-[0.2em] bg-rose-500/20 text-rose-400 font-bold px-2.5 py-0.5 rounded border border-rose-500/40 animate-pulse font-['Orbitron'] shadow-md shadow-rose-500/20";
+                    dashboard.classList.add('fever-glow');
+                } else {
+                    badge.innerText = "HARDCORE EDITION";
+                    badge.className = "text-[9px] tracking-[0.2em] bg-red-950/40 text-rose-400 font-semibold px-2.5 py-0.5 rounded border border-rose-500/10 font-['Orbitron']";
+                    dashboard.classList.remove('fever-glow');
+                }
+            },
+
+            triggerCombo() {
+                this.combo++;
+                this.comboTimer = Date.now();
+                
+                if (this.combo >= 2 && !this.isFever) {
+                    this.isFever = true;
+                    AudioSynth.playFeverIn();
+                }
+                
+                this.updateFeverUI();
+            },
+
+            createExplosion(x, y) {
+                const colors = ['#f43f5e', '#ec4899', '#fda4af', '#ffffff'];
+                for (let i = 0; i < 35; i++) {
+                    this.particles.push({
+                        x: x,
+                        y: y,
+                        vx: Rnd.val(-5, 5),
+                        vy: Rnd.val(-5, 5),
+                        radius: Rnd.val(1, 3),
+                        color: Rnd.choose(colors),
+                        alpha: 1,
+                        decay: Rnd.val(0.02, 0.04)
+                    });
+                }
+            },
+
+            updateParticles() {
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.alpha -= p.decay;
+                    if (p.alpha <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+            },
+
+            render() {
+                const stage = STAGES[this.currentStageIdx];
+                if (!stage) return;
+
+                // 1. LEFT 캔버스 처리
+                this.ctxL.save();
+                if (this.zoomActive) {
+                    this.ctxL.translate(this.panX, this.panY);
+                    this.ctxL.scale(this.zoomScale, this.zoomScale);
+                }
+                
+                this.ctxL.clearRect(0, 0, this.baseWidth, this.baseHeight);
+                if (this.imageLoaded && this.currentImg) {
+                    this.ctxL.drawImage(this.currentImg, 0, 0, this.baseWidth, this.baseHeight);
+                } else {
+                    stage.drawFallback(this.ctxL);
+                }
+                
+                // 원본은 변경 사항 없음 (수정 없음)
+                stage.differences.forEach(diff => diff.draw(this.ctxL, false, this.currentImg));
+                this.ctxL.restore();
+
+                // 2. RIGHT 캔버스 처리
+                this.ctxR.save();
+                if (this.zoomActive) {
+                    this.ctxR.translate(this.panX, this.panY);
+                    this.ctxR.scale(this.zoomScale, this.zoomScale);
+                }
+                
+                this.ctxR.clearRect(0, 0, this.baseWidth, this.baseHeight);
+                if (this.imageLoaded && this.currentImg) {
+                    this.ctxR.drawImage(this.currentImg, 0, 0, this.baseWidth, this.baseHeight);
+                } else {
+                    stage.drawFallback(this.ctxR);
+                }
+
+                // 변형 드로잉 (실시간 텍스처 복제 오버레이 활성화)
+                stage.differences.forEach(diff => {
+                    const isActive = this.activeDifferences.some(ad => ad.id === diff.id);
+                    diff.draw(this.ctxR, isActive, this.currentImg);
+                });
+                this.ctxR.restore();
+
+                // 3. 체킹 링 표시 렌더
+                this.foundDiffs.forEach(diffId => {
+                    const diffObj = this.activeDifferences.find(d => d.id === diffId);
+                    if (diffObj) {
+                        this.drawCheckedMark(this.ctxL, diffObj.hitX, diffObj.hitY, diffObj.radius);
+                        this.drawCheckedMark(this.ctxR, diffObj.hitX, diffObj.hitY, diffObj.radius);
+                    }
+                });
+
+                // 4. 실시간 파티클 드로잉
+                this.particles.forEach(p => {
+                    this.drawParticle(this.ctxL, p);
+                    this.drawParticle(this.ctxR, p);
+                });
+            },
+
+            drawParticle(ctx, p) {
+                ctx.save();
+                if (this.zoomActive) {
+                    ctx.translate(this.panX, this.panY);
+                    ctx.scale(this.zoomScale, this.zoomScale);
+                }
+                ctx.globalAlpha = p.alpha;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.fill();
+                ctx.restore();
+            },
+
+            drawCheckedMark(ctx, x, y, r) {
+                ctx.save();
+                if (this.zoomActive) {
+                    ctx.translate(this.panX, this.panY);
+                    ctx.scale(this.zoomScale, this.zoomScale);
+                }
+                // 타겟 초록 체크 링
+                ctx.beginPath();
+                ctx.arc(x, y, r + 4, 0, Math.PI * 2);
+                ctx.strokeStyle = '#10b981';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(x - 3, y); ctx.lineTo(x + 3, y);
+                ctx.moveTo(x, y - 3); ctx.lineTo(x, y + 3);
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.restore();
+            },
+
+            handleCanvasClick(e, side) {
+                if (!this.gameActive || this.isDragging) return;
+
+                const canvas = side === 'left' ? this.canvasL : this.canvasR;
+                const rect = canvas.getBoundingClientRect();
+
+                const clickXOnCanvas = (e.clientX - rect.left) * (this.baseWidth / rect.width);
+                const clickYOnCanvas = (e.clientY - rect.top) * (this.baseHeight / rect.height);
+
+                let targetX = clickXOnCanvas;
+                let targetY = clickYOnCanvas;
+
+                if (this.zoomActive) {
+                    targetX = (clickXOnCanvas - this.panX) / this.zoomScale;
+                    targetY = (clickYOnCanvas - this.panY) / this.zoomScale;
+                }
+
+                this.processHit(targetX, targetY);
+            },
+
+            processHit(targetX, targetY) {
+                let hitSuccess = false;
+
+                // 극도로 엄격한 16px의 하드코어 판정 반경 검사
+                for (let i = 0; i < this.activeDifferences.length; i++) {
+                    const diff = this.activeDifferences[i];
+                    if (this.foundDiffs.includes(diff.id)) continue;
+
+                    const dist = Math.hypot(targetX - diff.hitX, targetY - diff.hitY);
+                    
+                    if (dist <= diff.radius + 2) { 
+                        hitSuccess = true;
+                        this.foundDiffs.push(diff.id);
+                        
+                        this.triggerCombo();
+                        AudioSynth.playCorrect(this.combo);
+                        this.createExplosion(diff.hitX, diff.hitY);
+
+                        let multiplier = 1.0 + (this.combo * 0.3);
+                        if (multiplier > 2.5) multiplier = 2.5;
+
+                        const baseScore = 300; 
+                        const addedScore = Math.floor(baseScore * multiplier);
+                        this.score += addedScore;
+
+                        this.updateScoreUI();
+                        document.getElementById('found-count').innerText = this.foundDiffs.length;
+
+                        this.spawnFloatingText(diff.hitX, diff.hitY, `+${addedScore} SUCCESS`);
+                        this.updateProgressDots();
+                        this.render();
+
+                        if (this.foundDiffs.length === 5) {
+                            this.triggerStageClear();
+                        }
+                        break;
+                    }
+                }
+
+                if (!hitSuccess) {
+                    this.triggerPenalty();
+                }
+            },
+
+            spawnFloatingText(targetX, targetY, text) {
+                const wrapperL = document.getElementById('float-left');
+                const wrapperR = document.getElementById('float-right');
+
+                const createElem = () => {
+                    const el = document.createElement('div');
+                    el.innerText = text;
+                    el.className = "absolute font-bold text-[10px] font-['Orbitron'] text-emerald-400 drop-shadow-[0_2px_5px_rgba(16,185,129,0.5)] select-none transition-all duration-1000 ease-out";
+                    
+                    let dispX = targetX;
+                    let dispY = targetY;
+
+                    if (this.zoomActive) {
+                        dispX = (targetX * this.zoomScale) + this.panX;
+                        dispY = (targetY * this.zoomScale) + this.panY;
+                    }
+
+                    const pctX = (dispX / this.baseWidth) * 100;
+                    const pctY = (dispY / this.baseHeight) * 100;
+                    el.style.left = `${pctX}%`;
+                    el.style.top = `${pctY}%`;
+                    el.style.transform = "translate(-50%, -50%)";
+
+                    setTimeout(() => {
+                        el.style.top = `${pctY - 10}%`;
+                        el.style.opacity = '0';
+                    }, 50);
+
+                    setTimeout(() => el.remove(), 1050);
+                    return el;
+                };
+
+                if (targetX >= 0 && targetX <= this.baseWidth && targetY >= 0 && targetY <= this.baseHeight) {
+                    wrapperL.appendChild(createElem());
+                    wrapperR.appendChild(createElem());
+                }
+            },
+
+            triggerPenalty() {
+                this.combo = 0;
+                this.isFever = false;
+                this.updateFeverUI();
+
+                AudioSynth.playWrong();
+                
+                // 오답 패널티: 시간 강제 단축 (7초 즉각 증발)
+                this.timer = Math.max(0, this.timer - 7);
+                document.getElementById('timer-text').innerText = `${this.timer}s`;
+                
+                this.hearts--;
+                this.score = Math.max(0, this.score - 100); 
+                this.updateScoreUI();
+                this.updateHeartsUI();
+
+                const container = document.getElementById('game-canvases-container');
+                container.classList.add('shake-effect');
+                setTimeout(() => container.classList.remove('shake-effect'), 350);
+
+                if (this.hearts <= 0) {
+                    this.triggerGameOver("보안 무결성 검증 한도를 상실했습니다.");
+                }
+            },
+
+            updateScoreUI() {
+                const padded = String(this.score).padStart(5, '0');
+                document.getElementById('score-display').innerText = `SCORE: ${padded}`;
+            },
+
+            updateHeartsUI() {
+                const parent = document.getElementById('heart-container');
+                parent.innerHTML = '';
+                for (let i = 0; i < 5; i++) {
+                    const heartSpan = document.createElement('span');
+                    heartSpan.innerText = i < this.hearts ? '◆' : '◇';
+                    heartSpan.className = i < this.hearts ? 'text-rose-600 font-black' : 'text-slate-800';
+                    parent.appendChild(heartSpan);
+                }
+            },
+
+            updateProgressDots() {
+                const parent = document.getElementById('progress-dots');
+                parent.innerHTML = '';
+                const foundCount = this.foundDiffs.length;
+                for (let i = 0; i < 5; i++) {
+                    const dot = document.createElement('div');
+                    dot.className = `w-1.5 h-1.5 rounded-full transition-all duration-500 ${i < foundCount ? 'bg-rose-500 shadow-md shadow-rose-500/50 scale-125' : 'bg-slate-900 border border-white/5'}`;
+                    parent.appendChild(dot);
+                }
+            },
+
+            useHint() {
+                if (!this.gameActive || this.hintsLeft <= 0) return;
+
+                const unfound = this.activeDifferences.find(diff => !this.foundDiffs.includes(diff.id));
+                if (unfound) {
+                    this.hintsLeft--;
+                    document.getElementById('hint-count-badge').innerText = this.hintsLeft;
+                    AudioSynth.playHint();
+
+                    this.createExplosion(unfound.hitX, unfound.hitY);
+
+                    const flashInterval = setInterval(() => {
+                        this.spawnFloatingText(unfound.hitX, unfound.hitY, "WARN");
+                    }, 400);
+
+                    setTimeout(() => clearInterval(flashInterval), 1300);
+                }
+            },
+
+            triggerStageClear() {
+                this.gameActive = false;
+                if (this.timerInterval) clearInterval(this.timerInterval);
+                AudioSynth.playWin();
+
+                const timeBonus = this.timer * 35; 
+                this.score += timeBonus;
+
+                document.getElementById('success-score').innerText = this.score - timeBonus;
+                document.getElementById('success-time-bonus').innerText = `+${timeBonus}`;
+                
+                const isLast = this.currentStageIdx === STAGES.length - 1;
+                const nextBtn = document.getElementById('success-next-btn');
+                
+                if (isLast) {
+                    document.getElementById('success-message').innerHTML = `🎉 하드코어 무결점 검증 성공! 당신의 분석력은 <strong class="text-rose-400">최상위 0.1% 아날로그 해커</strong> 수준입니다.`;
+                    nextBtn.innerText = "COMPLETE LOGOUT";
+                } else {
+                    document.getElementById('success-message').innerText = `${this.currentStageIdx + 1}구역 정밀 복구 완료. 다음 세그먼트로 이동합니다.`;
+                    nextBtn.innerText = "NEXT DECRYPT TARGET";
+                }
+
+                document.getElementById('modal-success').classList.remove('hidden');
+            },
+
+            loadNextStage() {
+                document.getElementById('modal-success').classList.add('hidden');
+                
+                if (this.currentStageIdx === STAGES.length - 1) {
+                    this.resetGame();
+                } else {
+                    this.currentStageIdx++;
+                    this.zoomActive = false;
+                    document.getElementById('zoom-status-text').innerText = "1.0x";
+                    document.getElementById('zoom-status-text').className = "text-rose-500 font-extrabold";
+                    this.setupStage();
+                }
+            },
+
+            triggerGameOver(reason) {
+                this.gameActive = false;
+                if (this.timerInterval) clearInterval(this.timerInterval);
+                AudioSynth.playGameOver();
+
+                document.getElementById('fail-reason-text').innerText = reason;
+                document.getElementById('modal-fail').classList.remove('hidden');
+            },
+
+            restartCurrentStage() {
+                document.getElementById('modal-fail').classList.add('hidden');
+                this.zoomActive = false;
+                document.getElementById('zoom-status-text').innerText = "1.0x";
+                document.getElementById('zoom-status-text').className = "text-rose-500 font-extrabold";
+                this.setupStage();
+            },
+
+            resetGame() {
+                document.getElementById('modal-success').classList.add('hidden');
+                document.getElementById('modal-fail').classList.add('hidden');
+                document.getElementById('modal-intro').classList.remove('hidden');
+                this.gameActive = false;
+                this.combo = 0;
+                this.isFever = false;
+                this.zoomActive = false;
+                this.updateFeverUI();
+                if (this.timerInterval) clearInterval(this.timerInterval);
+            },
+
+            showManual() {
+                document.getElementById('modal-intro').classList.remove('hidden');
+            }
+        };
+
+        window.onload = function() {
+            Game.init();
+        };
+    </script>
+</body>
+</html>
